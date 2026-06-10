@@ -1,5 +1,5 @@
 [project]
-name = "rag-techniques-ja"
+name = "rag-sandbox"
 version = "0.1.0"
 description = "RAG技術を試すサンドボックス"
 readme = "README.md"
