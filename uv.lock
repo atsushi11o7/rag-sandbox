@@ -1990,7 +1990,7 @@ wheels = [
 ]
 
 [[package]]
-name = "rag-techniques-ja"
+name = "rag-sandbox"
 version = "0.1.0"
 source = { virtual = "." }
 dependencies = [
