@@ -5,6 +5,8 @@ BaseRetriever を継承して独自実装する。
 分かち書きは fugashi（MeCab ラッパー）、スコアリングは rank_bm25 の BM25Okapi を使用。
 """
 
+from copy import copy
+
 from fugashi import Tagger
 from langchain_core.callbacks.manager import CallbackManagerForRetrieverRun
 from langchain_core.documents import Document
@@ -70,8 +72,22 @@ class JapaneseBM25Retriever(BaseRetriever):
             run_manager: LangChain コールバックマネージャー。
 
         Returns:
-            BM25 スコア降順で上位 k 件の Document リスト。
+            BM25 スコア降順で上位 k 件の Document リスト。スコアが 0 の文書は除外する。
+            各 Document の metadata に bm25_score が追加される。
         """
         scores = self._bm25.get_scores(self._tokenize(query))
-        ranked = sorted(zip(self.docs, scores, strict=True), key=lambda x: x[1], reverse=True)
-        return [doc for doc, _ in ranked[: self.k]]
+        ranked = sorted(
+            [
+                (doc, float(score))
+                for doc, score in zip(self.docs, scores, strict=True)
+                if score > 0
+            ],
+            key=lambda x: x[1],
+            reverse=True,
+        )
+        results = []
+        for doc, score in ranked[: self.k]:
+            new_doc = copy(doc)
+            new_doc.metadata = {**doc.metadata, "bm25_score": score}
+            results.append(new_doc)
+        return results

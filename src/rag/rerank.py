@@ -15,15 +15,19 @@ langchain_core の BaseDocumentCompressor を継承して LangChain パイプラ
     )
 """
 
+from copy import copy
 
 from langchain_core.callbacks.manager import Callbacks
 from langchain_core.documents import Document
 from langchain_core.documents.compressor import BaseDocumentCompressor
+from pydantic import PrivateAttr, model_validator
 from sentence_transformers import CrossEncoder
 
 
 class CrossEncoderReranker(BaseDocumentCompressor):
     """sentence_transformers の CrossEncoder でドキュメントを再ランク付けする compressor。
+
+    rerank_score を metadata に追加して返す。
 
     Attributes:
         model_name: 使用する Cross-Encoder のモデル名。
@@ -39,14 +43,14 @@ class CrossEncoderReranker(BaseDocumentCompressor):
 
     model_name: str = "cl-nagoya/ruri-reranker-large"
     top_n: int = 5
-    _model: CrossEncoder | None = None
+    _model: CrossEncoder = PrivateAttr()
 
     model_config = {"arbitrary_types_allowed": True}
 
-    def _get_model(self) -> CrossEncoder:
-        if self._model is None:
-            object.__setattr__(self, "_model", CrossEncoder(self.model_name))
-        return self._model
+    @model_validator(mode="after")
+    def _init_model(self) -> "CrossEncoderReranker":
+        self._model = CrossEncoder(self.model_name)
+        return self
 
     def compress_documents(
         self,
@@ -56,6 +60,8 @@ class CrossEncoderReranker(BaseDocumentCompressor):
     ) -> list[Document]:
         """クエリとの関連度でドキュメントを再ランク付けして上位 top_n 件を返す。
 
+        rerank_score を各 Document の metadata に追加する。
+
         Args:
             documents: 再ランク対象の Document リスト。
             query: 検索クエリ文字列。
@@ -63,11 +69,16 @@ class CrossEncoderReranker(BaseDocumentCompressor):
 
         Returns:
             関連度スコア降順で上位 top_n 件の Document リスト。
+            各 Document の metadata に rerank_score が追加される。
         """
         if not documents:
             return []
-        model = self._get_model()
         pairs = [(query, doc.page_content) for doc in documents]
-        scores = model.predict(pairs)
+        scores = self._model.predict(pairs)
         ranked = sorted(zip(documents, scores, strict=True), key=lambda x: x[1], reverse=True)
-        return [doc for doc, _ in ranked[: self.top_n]]
+        results = []
+        for doc, score in ranked[: self.top_n]:
+            new_doc = copy(doc)
+            new_doc.metadata = {**doc.metadata, "rerank_score": float(score)}
+            results.append(new_doc)
+        return results

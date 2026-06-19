@@ -15,6 +15,7 @@ from langchain_core.callbacks.manager import CallbackManagerForRetrieverRun
 from langchain_core.documents import Document
 from langchain_core.retrievers import BaseRetriever
 from langchain_ollama import OllamaLLM
+from pydantic import PrivateAttr, model_validator
 
 _PROMPT = "次の質問に答える日本語の文章を簡潔に書いてください。\n質問: {query}\n回答:"
 
@@ -37,11 +38,17 @@ class HydeRetriever(BaseRetriever):
     model: str = "qwen2.5:7b"
     ollama_host: str | None = None
 
+    _llm: OllamaLLM = PrivateAttr()
+
     model_config = {"arbitrary_types_allowed": True}
 
-    def _get_llm(self) -> OllamaLLM:
+    @model_validator(mode="after")
+    def _init_llm(self) -> "HydeRetriever":
         host = self.ollama_host or os.environ.get("OLLAMA_HOST")
-        return OllamaLLM(model=self.model, base_url=host) if host else OllamaLLM(model=self.model)
+        self._llm = (
+            OllamaLLM(model=self.model, base_url=host) if host else OllamaLLM(model=self.model)
+        )
+        return self
 
     def _get_relevant_documents(
         self,
@@ -58,5 +65,5 @@ class HydeRetriever(BaseRetriever):
         Returns:
             仮回答文で検索した結果の Document リスト。
         """
-        hypothesis = self._get_llm().invoke(_PROMPT.format(query=query))
+        hypothesis = self._llm.invoke(_PROMPT.format(query=query))
         return self.base_retriever.invoke(hypothesis)
