@@ -5,9 +5,13 @@
     2. FAISS インデックス構築（インメモリ）
     3. 各 Retriever で全クエリを検索
     4. nDCG / MRR / Recall を平均して出力
+
+環境変数:
+    ENABLE_HYDE=1  HyDE Retriever も評価対象に追加する（Ollama 接続が必要）。
 """
 
 import json
+import os
 from pathlib import Path
 
 from langchain_community.vectorstores import FAISS
@@ -18,11 +22,19 @@ from src.rag.chunking import split_documents
 from src.rag.corpus import load_md_corpus
 from src.rag.embeddings import PrefixedEmbeddings
 from src.rag.metrics import mrr_at_k, ndcg_at_k, recall_at_k
-from src.rag.retrievers import HybridRetriever, JapaneseBM25Retriever, build_dense_retriever
+from src.rag.rerank import CrossEncoderReranker
+from src.rag.retrievers import (
+    HybridRetriever,
+    HydeRetriever,
+    JapaneseBM25Retriever,
+    RerankedRetriever,
+    build_dense_retriever,
+)
 
 CORPUS_DIR = "data/corpus"
 QRELS_PATH = "data/qrels.jsonl"
-TOP_K = 10
+CANDIDATE_K = 50  # 一次検索（Dense / BM25）で取得する候補件数
+TOP_K = 10  # 最終的に評価・返却する件数
 
 
 def load_qrels(path: str) -> list[dict]:
@@ -33,9 +45,15 @@ def load_qrels(path: str) -> list[dict]:
 
     Returns:
         クエリと正解 doc_id リストの辞書リスト。
+
+    Raises:
+        ValueError: qrels が空のとき。
     """
     lines = Path(path).read_text(encoding="utf-8").splitlines()
-    return [json.loads(line) for line in lines if line.strip()]
+    qrels = [json.loads(line) for line in lines if line.strip()]
+    if not qrels:
+        raise ValueError(f"qrels is empty: {path}")
+    return qrels
 
 
 def to_doc_ids(docs: list[Document]) -> list[str]:
@@ -85,11 +103,18 @@ def main() -> None:
     chunks = split_documents(docs)
 
     embeddings = PrefixedEmbeddings()
+    # embeddings 側で L2 正規化しているため、FAISS の L2 距離によるランキングは cosine 類似度と同等
     store = FAISS.from_documents(chunks, embeddings)
 
-    dense = build_dense_retriever(store, top_k=TOP_K)
-    bm25 = JapaneseBM25Retriever.from_documents(chunks, k=TOP_K)
-    hybrid = HybridRetriever(retrievers=[dense, bm25])
+    # 一次検索は CANDIDATE_K 件取得し、Hybrid / Rerank で TOP_K に絞る
+    dense = build_dense_retriever(store, top_k=CANDIDATE_K)
+    bm25 = JapaneseBM25Retriever.from_documents(chunks, k=CANDIDATE_K)
+    hybrid = HybridRetriever(retrievers=[dense, bm25], candidate_k=CANDIDATE_K, top_k=TOP_K)
+    hybrid_rerank = RerankedRetriever(
+        base_retriever=hybrid,
+        reranker=CrossEncoderReranker(top_n=TOP_K),
+        candidate_k=TOP_K,
+    )
 
     qrels = load_qrels(QRELS_PATH)
 
@@ -97,13 +122,17 @@ def main() -> None:
         "dense": dense,
         "bm25": bm25,
         "hybrid": hybrid,
+        "hybrid+rerank": hybrid_rerank,
     }
 
-    print(f"\n{'retriever':<10} {'nDCG@k':>8} {'MRR@k':>8} {'Recall@k':>9}")
-    print("-" * 38)
+    if os.environ.get("ENABLE_HYDE") == "1":
+        retrievers["hyde"] = HydeRetriever(base_retriever=dense)
+
+    print(f"\n{'retriever':<16} {'nDCG@k':>8} {'MRR@k':>8} {'Recall@k':>9}")
+    print("-" * 44)
     for name, retriever in retrievers.items():
         m = evaluate(retriever, qrels)
-        print(f"{name:<10} {m['nDCG']:>8.4f} {m['MRR']:>8.4f} {m['Recall']:>9.4f}")
+        print(f"{name:<16} {m['nDCG']:>8.4f} {m['MRR']:>8.4f} {m['Recall']:>9.4f}")
 
 
 if __name__ == "__main__":
