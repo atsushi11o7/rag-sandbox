@@ -6,6 +6,7 @@ LCEL（LangChain Expression Language）で prompt | llm | parser のチェーン
 
 import os
 
+from langchain_community.document_transformers import LongContextReorder
 from langchain_core.documents import Document
 from langchain_core.output_parsers import StrOutputParser
 from langchain_core.prompts import ChatPromptTemplate
@@ -39,8 +40,10 @@ class RAGGenerator(BaseModel):
 
     model: str = "qwen2.5:7b"
     ollama_host: str | None = None
+    reorder: bool = False
 
     _chain: Runnable = PrivateAttr()
+    _reorderer: LongContextReorder | None = PrivateAttr(default=None)
 
     model_config = {"arbitrary_types_allowed": True}
 
@@ -49,6 +52,8 @@ class RAGGenerator(BaseModel):
         host = self.ollama_host or os.environ.get("OLLAMA_HOST")
         llm = ChatOllama(model=self.model, base_url=host) if host else ChatOllama(model=self.model)
         self._chain = _PROMPT | llm | StrOutputParser()
+        if self.reorder:
+            self._reorderer = LongContextReorder()
         return self
 
     def generate(self, query: str, docs: list[Document]) -> str:
@@ -61,5 +66,6 @@ class RAGGenerator(BaseModel):
         Returns:
             LLM が生成した回答文字列。
         """
-        context = _CONTEXT_SEP.join(doc.page_content for doc in docs)
+        ordered = self._reorderer.transform_documents(docs) if self._reorderer else docs
+        context = _CONTEXT_SEP.join(doc.page_content for doc in ordered)
         return self._chain.invoke({"context": context, "query": query})
