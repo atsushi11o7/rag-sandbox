@@ -67,13 +67,15 @@ def to_doc_ids(docs: list[Document]) -> list[str]:
     Returns:
         重複排除済みの doc_id リスト（出現順）。
     """
-    seen: list[str] = []
+    seen: set[str] = set()
+    result: list[str] = []
     for doc in docs:
         chunk_id = doc.metadata.get("chunk_id") or doc.metadata.get("doc_id", "")
         doc_id = chunk_id.split("#")[0]
         if doc_id and doc_id not in seen:
-            seen.append(doc_id)
-    return seen
+            seen.add(doc_id)
+            result.append(doc_id)
+    return result
 
 
 def evaluate(retriever: BaseRetriever, qrels: list[dict]) -> dict[str, float]:
@@ -103,17 +105,17 @@ def main() -> None:
     chunks = split_documents(docs)
 
     embeddings = PrefixedEmbeddings()
-    # embeddings 側で L2 正規化しているため、FAISS の L2 距離によるランキングは cosine 類似度と同等
+    # 評価用のインメモリインデックス（永続化不要のため build_faiss は使わない）
+    # embeddings 側で L2 正規化しているため、FAISS の L2 距離は cosine 類似度と同等
     store = FAISS.from_documents(chunks, embeddings)
 
     # 一次検索は CANDIDATE_K 件取得し、Hybrid / Rerank で TOP_K に絞る
     dense = build_dense_retriever(store, top_k=CANDIDATE_K)
     bm25 = JapaneseBM25Retriever.from_documents(chunks, k=CANDIDATE_K)
-    hybrid = HybridRetriever(retrievers=[dense, bm25], candidate_k=CANDIDATE_K, top_k=TOP_K)
+    hybrid = HybridRetriever(retrievers=[dense, bm25], candidate_k=CANDIDATE_K, top_k=CANDIDATE_K)
     hybrid_rerank = RerankedRetriever(
         base_retriever=hybrid,
         reranker=CrossEncoderReranker(top_n=TOP_K),
-        candidate_k=TOP_K,
     )
 
     qrels = load_qrels(QRELS_PATH)

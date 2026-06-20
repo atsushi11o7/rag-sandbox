@@ -3,7 +3,7 @@
 複数の Retriever の結果を Reciprocal Rank Fusion（RRF）で統合する。
 EnsembleRetriever は langchain_classic（レガシー）にしかないため BaseRetriever で独自実装する。
 
-RRF スコア = Σ 1 / (k + rank)
+RRF スコア = Σ 1 / (k + rank)、rank は 1 始まり（enumerate の 0-based index に +1 して換算）。
 k=60 はランキングの上位・下位の差を平滑化するための定数（論文デフォルト値）。
 """
 
@@ -56,9 +56,11 @@ class HybridRetriever(BaseRetriever):
         for retriever in self.retrievers:
             results = retriever.invoke(query)
             for rank, doc in enumerate(results[: self.candidate_k]):
-                key = doc.metadata.get("chunk_id") or doc.metadata.get(
-                    "doc_id", doc.page_content[:50]
-                )
+                key = doc.metadata.get("chunk_id") or doc.metadata.get("doc_id")
+                if not key:
+                    raise ValueError(
+                        f"Document has neither chunk_id nor doc_id in metadata: {doc.metadata}"
+                    )
                 rrf_scores[key] = rrf_scores.get(key, 0.0) + 1.0 / (self.k + rank + 1)
                 doc_map[key] = doc
 
