@@ -7,6 +7,8 @@ RRF スコア = Σ 1 / (k + rank)、rank は 1 始まり（enumerate の 0-based
 k=60 はランキングの上位・下位の差を平滑化するための定数（論文デフォルト値）。
 """
 
+from copy import copy
+
 from langchain_core.callbacks.manager import CallbackManagerForRetrieverRun
 from langchain_core.documents import Document
 from langchain_core.retrievers import BaseRetriever
@@ -65,4 +67,9 @@ class HybridRetriever(BaseRetriever):
                 doc_map[key] = doc
 
         ranked = sorted(rrf_scores.items(), key=lambda x: x[1], reverse=True)
-        return [doc_map[key] for key, _ in ranked[: self.top_k]]
+        results = []
+        for key, score in ranked[: self.top_k]:
+            doc = copy(doc_map[key])
+            doc.metadata = {**doc.metadata, "rrf_score": float(score)}
+            results.append(doc)
+        return results

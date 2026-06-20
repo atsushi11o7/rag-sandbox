@@ -16,12 +16,24 @@ from pydantic import BaseModel, PrivateAttr, model_validator
 
 _PROMPT = ChatPromptTemplate.from_messages(
     [
-        ("system", "必ず日本語のみで答えてください。"),
-        ("user", "以下の文書を参考に、質問に答えてください。\n\n文書:\n{context}\n\n質問: {query}"),
+        (
+            "system",
+            "必ず日本語のみで答えてください。"
+            "与えられた文書に根拠がない内容は推測せず、分からないと答えてください。",
+        ),
+        (
+            "user",
+            "以下の文書を参考に、質問に答えてください。\n\n文書:\n{context}\n\n質問: {query}",
+        ),
     ]
 )
 
 _CONTEXT_SEP = "\n---\n"
+
+
+def _format_doc(doc: Document, i: int) -> str:
+    source = doc.metadata.get("title") or doc.metadata.get("doc_id", f"doc-{i}")
+    return f"[{i}] source: {source}\n{doc.page_content}"
 
 
 class RAGGenerator(BaseModel):
@@ -67,5 +79,5 @@ class RAGGenerator(BaseModel):
             LLM が生成した回答文字列。
         """
         ordered = self._reorderer.transform_documents(docs) if self._reorderer else docs
-        context = _CONTEXT_SEP.join(doc.page_content for doc in ordered)
+        context = _CONTEXT_SEP.join(_format_doc(doc, i) for i, doc in enumerate(ordered, 1))
         return self._chain.invoke({"context": context, "query": query})

@@ -14,6 +14,7 @@ def build_dense_retriever(
     top_k: int = 10,
     mmr: bool = False,
     lambda_mult: float = 0.5,
+    fetch_k: int = 50,
 ) -> BaseRetriever:
     """FAISS ストアから Dense Retriever を生成する。
 
@@ -22,6 +23,7 @@ def build_dense_retriever(
         top_k: 返す件数。
         mmr: True のとき MMR（Maximal Marginal Relevance）で多様性を考慮した検索を行う。
         lambda_mult: MMR の関連性と多様性のバランス（0.0=多様性重視, 1.0=関連性重視）。mmr=True のときのみ有効。
+        fetch_k: MMR の候補取得件数。この中から多様性を考慮して top_k 件を選ぶ。mmr=True のときのみ有効。
 
     Returns:
         VectorStoreRetriever インスタンス。
@@ -30,11 +32,11 @@ def build_dense_retriever(
         >>> emb = PrefixedEmbeddings()
         >>> store = load_faiss("data/index/faiss", emb)
         >>> retriever = build_dense_retriever(store, top_k=10)
-        >>> retriever_mmr = build_dense_retriever(store, top_k=10, mmr=True, lambda_mult=0.5)
+        >>> retriever_mmr = build_dense_retriever(store, top_k=10, mmr=True, fetch_k=50, lambda_mult=0.5)
     """
     if mmr:
         return store.as_retriever(
             search_type="mmr",
-            search_kwargs={"k": top_k, "lambda_mult": lambda_mult},
+            search_kwargs={"k": top_k, "fetch_k": fetch_k, "lambda_mult": lambda_mult},
         )
     return store.as_retriever(search_kwargs={"k": top_k})

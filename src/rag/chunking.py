@@ -50,6 +50,11 @@ def split_documents(
     )
     chunks = []
     for doc in docs:
+        if "doc_id" not in doc.metadata:
+            raise ValueError(
+                f"Document must have metadata['doc_id'] before splitting. "
+                f"Got metadata: {doc.metadata}"
+            )
         doc_chunks = splitter.split_documents([doc])
         for i, chunk in enumerate(doc_chunks):
             chunk.metadata["chunk_id"] = f"{chunk.metadata['doc_id']}#{i}"

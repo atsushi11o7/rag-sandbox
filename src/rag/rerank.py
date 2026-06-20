@@ -8,10 +8,10 @@ sentence_transformers の CrossEncoder を直接使い、
 langchain_core の BaseDocumentCompressor を継承して LangChain パイプラインに組み込む。
 
 使い方:
-    compressor = CrossEncoderReranker()
-    retriever = ContextualCompressionRetriever(
-        base_compressor=compressor,
+    reranker = CrossEncoderReranker(top_n=5)
+    retriever = RerankedRetriever(
         base_retriever=base_retriever,
+        reranker=reranker,
     )
 """
 
