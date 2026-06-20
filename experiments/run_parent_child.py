@@ -36,7 +36,9 @@ def main() -> None:
     print("Loading corpus and building Parent-Child index...")
     docs = load_md_corpus(CORPUS_DIR)
 
-    base = build_parent_child_retriever(docs, parent_size=PARENT_SIZE, child_size=CHILD_SIZE)
+    base = build_parent_child_retriever(
+        docs, parent_size=PARENT_SIZE, child_size=CHILD_SIZE, child_k=50
+    )
     retriever = RerankedRetriever(
         base_retriever=base,
         reranker=CrossEncoderReranker(top_n=TOP_K),

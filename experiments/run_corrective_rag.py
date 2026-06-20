@@ -54,19 +54,22 @@ def main() -> None:
     print(f"\nQuery: {args.query}")
     print("\nRunning Corrective RAG...")
 
-    full_state: dict = {"query": args.query}
+    full_state: dict = {"original_query": args.query, "search_query": args.query}
     current_query = args.query
     done = False
-    for step in app.stream({"query": args.query}):
+    for step in app.stream(
+        {"original_query": args.query, "search_query": args.query, "retries": 0}
+    ):
         node_name, state = next(iter(step.items()))
         full_state.update(state)
         if node_name == "retrieve":
             print(f"\n[retrieve] query={current_query!r}")
             print(f"           {len(state['documents'])} docs retrieved")
         elif node_name == "grade_documents":
-            print(f"[grade]    {state['grade']}")
+            n_relevant = len(state.get("documents", []))
+            print(f"[grade]    {state['grade']}  ({n_relevant} relevant docs)")
         elif node_name == "rewrite_query":
-            current_query = state["query"]
+            current_query = state["search_query"]
             print(f"[rewrite]  {current_query!r}  (retries={state['retries']})")
         elif node_name == "generate":
             done = True

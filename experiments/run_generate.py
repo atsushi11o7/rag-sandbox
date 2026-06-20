@@ -58,16 +58,17 @@ def main() -> None:
     dense = build_dense_retriever(store, top_k=CANDIDATE_K)
     bm25 = JapaneseBM25Retriever.from_documents(chunks, k=CANDIDATE_K)
     hybrid = HybridRetriever(retrievers=[dense, bm25], candidate_k=CANDIDATE_K, top_k=CANDIDATE_K)
-    base = RerankedRetriever(
-        base_retriever=hybrid,
-        reranker=CrossEncoderReranker(top_n=TOP_K),
-    )
 
     if args.tags:
-        retriever = TagFilteredRetriever(base_retriever=base, tags=args.tags)
         print(f"Tag filter: {args.tags}")
+        filtered = TagFilteredRetriever(base_retriever=hybrid, tags=args.tags)
     else:
-        retriever = base
+        filtered = hybrid
+
+    retriever = RerankedRetriever(
+        base_retriever=filtered,
+        reranker=CrossEncoderReranker(top_n=TOP_K),
+    )
 
     generator = RAGGenerator()
 

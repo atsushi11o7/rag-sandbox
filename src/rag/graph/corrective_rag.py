@@ -4,7 +4,7 @@
 
 流れ:
     retrieve
-      → grade_documents（文書の関連性を LLM-as-Judge で判定）
+      → grade_documents（文書ごとに LLM-as-Judge で関連性を判定）
           → relevant       → generate → END
           → not_relevant   → rewrite_query → retrieve（ループ）
     max_retries 回連続で not_relevant なら強制的に generate へ進む。
@@ -32,7 +32,7 @@ _GRADE_PROMPT = ChatPromptTemplate.from_messages(
         (
             "user",
             "クエリ: {query}\n\n文書:\n{context}\n\n"
-            "これらの文書はクエリに答えるために関連していますか？",
+            "この文書はクエリに答えるために関連していますか？",
         ),
     ]
 )
@@ -52,13 +52,16 @@ _REWRITE_PROMPT = ChatPromptTemplate.from_messages(
     ]
 )
 
-_CONTEXT_SEP = "\n---\n"
-
 
 class RAGState(TypedDict):
-    """Corrective RAG グラフ全体で共有するステート。"""
+    """Corrective RAG グラフ全体で共有するステート。
 
-    query: str
+    original_query: ユーザーが最初に入力したクエリ。生成時に使用し、書き換えない。
+    search_query:   実際の検索に使うクエリ。rewrite_query ノードで更新される。
+    """
+
+    original_query: str
+    search_query: str
     documents: list[Document]
     answer: str
     grade: str  # "relevant" | "not_relevant"
@@ -82,11 +85,16 @@ def build_corrective_rag(
 
     Returns:
         invoke() で実行できる LangGraph コンパイル済みグラフ。
-        入力: {"query": "..."} 、出力: RAGState（answer / documents などを含む）。
+        入力: {"original_query": "...", "search_query": "...", "retries": 0}
+        出力: RAGState（answer / documents などを含む）。
 
     Example:
         >>> app = build_corrective_rag(retriever, generator)
-        >>> result = app.invoke({"query": "uvの利点は？"})
+        >>> result = app.invoke({
+        ...     "original_query": "uvの利点は？",
+        ...     "search_query": "uvの利点は？",
+        ...     "retries": 0,
+        ... })
         >>> print(result["answer"])
     """
     host = generator.ollama_host or os.environ.get("OLLAMA_HOST")
@@ -102,22 +110,31 @@ def build_corrective_rag(
     # --- ノード定義 ---
 
     def retrieve(state: RAGState) -> dict:
-        docs = retriever.invoke(state["query"])
+        docs = retriever.invoke(state["search_query"])
         return {"documents": docs}
 
     def grade_documents(state: RAGState) -> dict:
-        context = _CONTEXT_SEP.join(doc.page_content for doc in state["documents"])
-        raw = grade_chain.invoke({"query": state["query"], "context": context}).strip().lower()
-        grade = "relevant" if raw.startswith("relevant") else "not_relevant"
-        return {"grade": grade}
+        # 文書ごとに判定し、関連ありの文書だけ残す
+        relevant_docs = []
+        for doc in state["documents"]:
+            raw = (
+                grade_chain.invoke({"query": state["search_query"], "context": doc.page_content})
+                .strip()
+                .lower()
+            )
+            if raw.startswith("relevant"):
+                relevant_docs.append(doc)
+        grade = "relevant" if relevant_docs else "not_relevant"
+        return {"documents": relevant_docs, "grade": grade}
 
     def generate(state: RAGState) -> dict:
-        answer = generator.generate(state["query"], state["documents"])
+        # 元のクエリに対して回答する（書き換え後のクエリは使わない）
+        answer = generator.generate(state["original_query"], state["documents"])
         return {"answer": answer}
 
     def rewrite_query(state: RAGState) -> dict:
-        new_query = rewrite_chain.invoke({"query": state["query"]}).strip()
-        return {"query": new_query, "retries": state.get("retries", 0) + 1}
+        new_query = rewrite_chain.invoke({"query": state["search_query"]}).strip()
+        return {"search_query": new_query, "retries": state.get("retries", 0) + 1}
 
     # --- 条件分岐 ---
 

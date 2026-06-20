@@ -34,12 +34,11 @@ rag-sandbox/
 │   ├── rerank.py                # CrossEncoderReranker（ruri-reranker-large）
 │   ├── generation.py            # RAGGenerator（LCEL チェーン + LongContextReorder）
 │   ├── metrics.py               # Recall@k / MRR@k / nDCG@k
-│   ├── retrievers/
-│   │   ├── base.py              # 共通インターフェース（index / search）
+│   ├── retrievers/              # 各手法。LangChain の BaseRetriever を継承
 │   │   ├── dense.py             # Dense Retriever（MMR オプション付き）
 │   │   ├── bm25.py              # 日本語 BM25 Retriever（fugashi + rank-bm25）
 │   │   ├── hybrid.py            # HybridRetriever（RRF 統合）
-│   │   ├── reranked.py          # RerankedRetriever（ContextualCompressionRetriever ラッパー）
+│   │   ├── reranked.py          # RerankedRetriever（CrossEncoderReranker のラッパー）
 │   │   ├── filtered.py          # TagFilteredRetriever（事後タグフィルタ）
 │   │   ├── hyde.py              # HydeRetriever（仮回答 → Dense）
 │   │   ├── multi_query.py       # ParaphraseRetriever / DecomposeRetriever
