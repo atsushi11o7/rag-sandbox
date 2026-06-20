@@ -6,10 +6,12 @@ from src.rag.retrievers.filtered import TagFilteredRetriever
 from src.rag.retrievers.hybrid import HybridRetriever
 from src.rag.retrievers.hyde import HydeRetriever
 from src.rag.retrievers.multi_query import DecomposeRetriever, ParaphraseRetriever
+from src.rag.retrievers.parent_child import build_parent_child_retriever
 from src.rag.retrievers.reranked import RerankedRetriever
 
 __all__ = [
     "build_dense_retriever",
+    "build_parent_child_retriever",
     "JapaneseBM25Retriever",
     "HybridRetriever",
     "RerankedRetriever",

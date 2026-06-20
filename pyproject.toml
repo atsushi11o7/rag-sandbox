@@ -42,6 +42,7 @@ dependencies = [
     "langchain-text-splitters>=1.1.2",
     "langchain-community>=0.4.2",
     "langchain-ollama>=1.1.0",
+    "langchain-classic>=1.0.8",
 ]
 
 [dependency-groups]
