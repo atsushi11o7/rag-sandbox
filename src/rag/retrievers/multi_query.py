@@ -13,6 +13,7 @@
 
 import os
 import re
+from copy import copy
 
 from langchain_core.callbacks.manager import CallbackManagerForRetrieverRun
 from langchain_core.documents import Document
@@ -80,7 +81,12 @@ def _rrf_merge(results_list: list[list[Document]], k: int = 60) -> list[Document
             rrf_scores[key] = rrf_scores.get(key, 0.0) + 1.0 / (k + rank + 1)
             doc_map[key] = doc
     ranked = sorted(rrf_scores.items(), key=lambda x: x[1], reverse=True)
-    return [doc_map[key] for key, _ in ranked]
+    results = []
+    for key, score in ranked:
+        doc = copy(doc_map[key])
+        doc.metadata = {**doc.metadata, "rrf_score": float(score)}
+        results.append(doc)
+    return results
 
 
 class ParaphraseRetriever(BaseRetriever):

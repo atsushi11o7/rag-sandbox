@@ -34,10 +34,10 @@ class CrossEncoderReranker(BaseDocumentCompressor):
         top_n: リランク後に返す上位件数。
 
     Example:
-        >>> compressor = CrossEncoderReranker(top_n=5)
-        >>> retriever = ContextualCompressionRetriever(
-        ...     base_compressor=compressor,
+        >>> reranker = CrossEncoderReranker(top_n=5)
+        >>> retriever = RerankedRetriever(
         ...     base_retriever=base_retriever,
+        ...     reranker=reranker,
         ... )
     """
 
