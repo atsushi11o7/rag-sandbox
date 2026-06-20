@@ -35,12 +35,24 @@ def fetch_items(user: str) -> list[dict]:
 
 
 def main() -> None:
-    """記事を取得して data/corpus/<記事ID>.md として保存する。"""
+    """記事を取得して data/corpus/<記事ID>.md / .json として保存する。"""
     OUT_DIR.mkdir(parents=True, exist_ok=True)
     items = fetch_items(USER)
     for item in items:
-        path = OUT_DIR / f"{item['id']}.md"
-        path.write_text(f"# {item['title']}\n\n{item['body']}", encoding="utf-8")
+        doc_id = item["id"]
+        (OUT_DIR / f"{doc_id}.md").write_text(
+            f"# {item['title']}\n\n{item['body']}", encoding="utf-8"
+        )
+        meta = {
+            "title": item["title"],
+            "created_at": item["created_at"],
+            "tags": [tag["name"] for tag in item.get("tags", [])],
+            "likes_count": item.get("likes_count", 0),
+            "url": item.get("url", ""),
+        }
+        (OUT_DIR / f"{doc_id}.json").write_text(
+            json.dumps(meta, ensure_ascii=False), encoding="utf-8"
+        )
     print(f"saved {len(items)} articles to {OUT_DIR}")
 
 
