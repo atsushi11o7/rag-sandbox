@@ -17,7 +17,7 @@ from langchain_core.retrievers import BaseRetriever
 from langchain_ollama import OllamaLLM
 from pydantic import PrivateAttr, model_validator
 
-_PROMPT = "次の質問に答える日本語の文章を簡潔に書いてください。\n質問: {query}\n回答:"
+_PROMPT = "必ず日本語のみで答えてください。\n次の質問に答える日本語の文章を簡潔に書いてください。\n質問: {query}\n回答:"
 
 
 class HydeRetriever(BaseRetriever):
