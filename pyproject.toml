@@ -10,22 +10,31 @@ dependencies = [
     "pandas>=2.2",
     "scipy>=1.12",
     "scikit-learn>=1.5",
-    # Embedding / Reranker（ruri-v3 / bge-m3 / 日本語Reranker）
+    # PyTorch (CUDA 12.6 対応 wheel)
+    "torch>=2.7",
+    # Embedding / Reranker（ruri-v3 / 日本語 Reranker）
     "transformers>=4.44",
     "sentence-transformers>=3.0",
-    "FlagEmbedding>=1.2",
     # 日本語キーワード検索（BM25 + 形態素解析）
     "fugashi>=1.3",
     "unidic-lite>=1.0.8",
     "rank-bm25>=0.2.2",
     # ベクトル検索
     "faiss-cpu>=1.8",
-    # 生成（Ollama）／HyDE の仮回答生成にも利用
-    "ollama>=0.3",
-    # 能動的検索（Agentic RAG / Self-RAG）
-    "langgraph>=1.0",
+    # LangChain エコシステム
     "langchain>=1.0",
     "langchain-core>=1.0",
+    "langchain-community>=0.4.2",
+    "langchain-ollama>=1.1.0",
+    "langchain-text-splitters>=1.1.2",
+    "langchain-classic>=1.0.8",
+    # 生成（Ollama）／HyDE の仮回答生成にも利用
+    "ollama>=0.3",
+    # ナレッジグラフ / GraphRAG
+    "networkx>=3.6.1",
+    "lightrag-hku>=1.5.4",
+    # 能動的検索（Agentic RAG / Corrective RAG）
+    "langgraph>=1.0",
     # 可視化
     "matplotlib>=3.8",
     "seaborn>=0.13",
@@ -36,13 +45,6 @@ dependencies = [
     "ipywidgets>=8.1",
     "tqdm>=4.66",
     "joblib>=1.3",
-    # PyTorch (CUDA 12.6 対応 wheel)
-    "torch>=2.7",
-    "langchain-huggingface>=1.2.2",
-    "langchain-text-splitters>=1.1.2",
-    "langchain-community>=0.4.2",
-    "langchain-ollama>=1.1.0",
-    "langchain-classic>=1.0.8",
 ]
 
 [dependency-groups]
